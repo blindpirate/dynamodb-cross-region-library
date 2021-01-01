@@ -37,7 +37,7 @@ public class CrossRegionReplicationIntegrationTests {
     public static final String INVENTORY_TABLE_PDX = "inventoryPdx";
     public static final String SKU_CODE = "skuCode";
     public static final String STORE = "store";
-    public static final String DYNAMODB_LOCAL_ENDPOINT = "http://0.0.0.0:4567";
+    public static final String DYNAMODB_LOCAL_ENDPOINT = "http://localhost:4567";
     public static final String ASIN_1 = "ASIN1";
     public static final String SEA = "SEA";
     public static final String CRR_INTEGRATION_TEST = "crrIntegrationTest";
@@ -63,7 +63,7 @@ public class CrossRegionReplicationIntegrationTests {
         dynamoDbIad = buildDynamoDbClient(Regions.US_EAST_1);
         iadTable = new Table(dynamoDbIad, INVENTORY_TABLE_IAD);
         dynamoDbPdx = buildDynamoDbClient(Regions.US_WEST_2);
-        pdxTable = new Table(dynamoDbIad, INVENTORY_TABLE_PDX);
+        pdxTable = new Table(dynamoDbPdx, INVENTORY_TABLE_PDX);
         try {
             dynamoDbIad.deleteTable(INVENTORY_TABLE_IAD);
             for (String tableName : dynamoDbIad.listTables().getTableNames()) {
@@ -109,14 +109,14 @@ public class CrossRegionReplicationIntegrationTests {
                 "--sourceEndpoint",
                 DYNAMODB_LOCAL_ENDPOINT,
                 // override the signing region as DynamoDB Local uses it to create different table namespaces
-                "--sourceSigningRegion",
+                "--sourceRegion",
                 Regions.US_EAST_1.getName(),
                 "--sourceTable",
                 INVENTORY_TABLE_IAD,
                 "--destinationEndpoint",
                 DYNAMODB_LOCAL_ENDPOINT,
                 // override the signing region as DynamoDB Local uses it to create different table namespaces
-                "--destinationSigningRegion",
+                "--destinationRegion",
                 Regions.US_WEST_2.getName(),
                 "--destinationTable",
                 INVENTORY_TABLE_PDX,
