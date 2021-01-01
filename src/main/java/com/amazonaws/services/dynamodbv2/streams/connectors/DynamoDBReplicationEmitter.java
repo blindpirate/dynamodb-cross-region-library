@@ -123,7 +123,7 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
     @Deprecated
     public DynamoDBReplicationEmitter(final DynamoDBStreamsConnectorConfiguration configuration) {
         this(configuration.APP_NAME, configuration.DYNAMODB_ENDPOINT, configuration.REGION_NAME, configuration.DYNAMODB_DATA_TABLE_NAME,
-            (AmazonCloudWatchAsync) new AmazonCloudWatchAsyncClient(new DefaultAWSCredentialsProviderChain(), Executors.newFixedThreadPool(MAX_THREADS)).withRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion()), new DefaultAWSCredentialsProviderChain());
+            (AmazonCloudWatchAsync) new AmazonCloudWatchAsyncClient(new DefaultAWSCredentialsProviderChain(), Executors.newFixedThreadPool(MAX_THREADS)).withRegion(Region.getRegion(Regions.US_EAST_1)), new DefaultAWSCredentialsProviderChain());
     }
 
     /**
@@ -188,11 +188,11 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
 
         final boolean setDynamoDB = DYNAMODB.compareAndSet(null, dynamoDBAsync);
         if (setDynamoDB && dynamoDBAsync != null) {
-            DYNAMODB.get().setEndpoint(endpoint);
+//            DYNAMODB.get().setEndpoint(endpoint);
         }
         final boolean setCloudWatch = CLOUDWATCH.compareAndSet(null, cloudwatch);
         if (setCloudWatch && cloudwatch != null) {
-            CLOUDWATCH.get().setRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion());
+//            CLOUDWATCH.get().setRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion());
         }
         skipErrors = false; // TODO make configurable
     }

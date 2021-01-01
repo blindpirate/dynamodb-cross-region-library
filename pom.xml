@@ -14,7 +14,7 @@
     </scm>
 
     <properties>
-        <aws.java.sdk.version>1.11.115</aws.java.sdk.version>
+        <aws.java.sdk.version>1.11.929</aws.java.sdk.version>
         <aws.dynamodblocal.version>1.11.86</aws.dynamodblocal.version>
         <amazon.kinesis-client-library.version>1.7.5</amazon.kinesis-client-library.version>
         <amazon.kinesis-connectors.version>1.3.0</amazon.kinesis-connectors.version>
@@ -36,7 +36,7 @@
         <jcommander.version>1.48</jcommander.version>
         <log4j.version>1.2.17</log4j.version>
         <maven.shade.version>2.4.1</maven.shade.version>
-        <java.jdk.version>1.7</java.jdk.version>
+        <java.jdk.version>1.8</java.jdk.version>
     </properties>
 
     <developers>
