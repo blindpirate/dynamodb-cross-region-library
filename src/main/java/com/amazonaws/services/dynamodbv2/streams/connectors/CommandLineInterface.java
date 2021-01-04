@@ -5,8 +5,11 @@
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -22,11 +25,13 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreams;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreamsClientBuilder;
 import com.amazonaws.services.dynamodbv2.model.Record;
+import com.amazonaws.services.dynamodbv2.streams.connectors.composite.CompositeRecordProcessorFactory;
 import com.amazonaws.services.dynamodbv2.streamsadapter.AmazonDynamoDBStreamsAdapterClient;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
 import com.amazonaws.services.kinesis.connectors.KinesisConnectorRecordProcessorFactory;
+import com.amazonaws.services.kinesis.connectors.interfaces.IKinesisConnectorPipeline;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import com.google.common.annotations.VisibleForTesting;
@@ -100,10 +105,11 @@ public class CommandLineInterface {
     private final boolean isPublishCloudWatch;
     private final String taskName;
     private final String destinationTable;
+    private final List<IKinesisConnectorPipeline<Record, Record>> pipelines;
     private final Optional<Long> parentShardPollIntervalMillis;
 
     @VisibleForTesting
-    CommandLineInterface(CommandLineArgs params) throws ParameterException {
+    public CommandLineInterface(CommandLineArgs params) throws ParameterException {
 
         // extract streams endpoint, source and destination regions
         sourceRegion = RegionUtils.getRegion(params.getSourceSigningRegion());
@@ -129,6 +135,20 @@ public class CommandLineInterface {
         isPublishCloudWatch = !params.isDontPublishCloudwatch();
         taskName = params.getTaskName();
         parentShardPollIntervalMillis = Optional.fromNullable(params.getParentShardPollIntervalMillis());
+
+        pipelines = initPipelines(params.getPipelineClassNames());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<IKinesisConnectorPipeline<Record, Record>> initPipelines(String pipelineClassNames) {
+        return Stream.of(pipelineClassNames.split(","))
+                .map(fqcn -> {
+                    try {
+                        return (IKinesisConnectorPipeline<Record, Record>) Class.forName(fqcn).getConstructor().newInstance();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }).collect(Collectors.toList());
     }
 
     @VisibleForTesting
@@ -196,8 +216,11 @@ public class CommandLineInterface {
 
         // create the record processor factory based on given pipeline and connector configurations
         // use the master to replicas pipeline
-        final KinesisConnectorRecordProcessorFactory<Record, Record> factory = new KinesisConnectorRecordProcessorFactory<>(
-                new DynamoDBMasterToReplicasPipeline(), new DynamoDBStreamsConnectorConfiguration(properties, credentialsProvider));
+        final List<KinesisConnectorRecordProcessorFactory<Record, Record>> factories = pipelines.stream().map(pipeline ->
+                new KinesisConnectorRecordProcessorFactory<>(
+                        pipeline,
+                        new DynamoDBStreamsConnectorConfiguration(properties, credentialsProvider))
+        ).collect(Collectors.toList());
 
         // create the KCL configuration with default values
         final KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(actualTaskName,
@@ -219,7 +242,13 @@ public class CommandLineInterface {
                 .withFailoverTimeMillis(DynamoDBConnectorConstants.KCL_FAILOVER_TIME);
 
         // create the KCL worker for this connector
-        return new Worker(factory, kclConfig, streamsAdapterClient, kclDynamoDBClient, kclCloudWatchClient);
+        return new Worker(
+                new CompositeRecordProcessorFactory(factories),
+                kclConfig,
+                streamsAdapterClient,
+                kclDynamoDBClient,
+                kclCloudWatchClient
+        );
     }
 
     @VisibleForTesting

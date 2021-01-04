@@ -39,6 +39,5 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
     public DynamoDBStreamsConnectorConfiguration(final Properties properties,
         final AWSCredentialsProvider credentialsProvider) {
         super(properties, credentialsProvider);
-
     }
 }

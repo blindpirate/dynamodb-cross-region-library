@@ -71,4 +71,8 @@ public class CommandLineArgs {
             description = "Wait for this long between polls to check if parent shards are done",
             hidden = true)
     private Long parentShardPollIntervalMillis;
+
+    public static final String PIPELINE_CLASS_NAMES = "--pipelineClassNames";
+    @Parameter(names = PIPELINE_CLASS_NAMES, description = "The FQCN of pipelines, separated by comma, e.g. com.my.Pipeline,com.your.Pipeline")
+    private String pipelineClassNames = DynamoDBMasterToReplicasPipeline.class.getName();
 }
