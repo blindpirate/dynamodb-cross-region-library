@@ -13,6 +13,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.After;
 import org.junit.Before;
@@ -25,7 +26,6 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
-import com.google.common.base.Optional;
 
 public class CommandLineInterfaceTests {
     private final String destinationSigningRegion = Regions.EU_WEST_1.getName();
@@ -65,8 +65,8 @@ public class CommandLineInterfaceTests {
 
     @Test
     public void testCreateEndpointConfiguration() {
-        final AwsClientBuilder.EndpointConfiguration config = CommandLineInterface.createEndpointConfiguration(RegionUtils.getRegion(Regions.US_EAST_1.getName()),
-                Optional.<String>absent(), AmazonDynamoDB.ENDPOINT_PREFIX);
+        final AwsClientBuilder.EndpointConfiguration config = KinesisWorkerCreator.createEndpointConfiguration(RegionUtils.getRegion(Regions.US_EAST_1.getName()),
+                Optional.empty(), AmazonDynamoDB.ENDPOINT_PREFIX);
         assertTrue(config.getServiceEndpoint().contains("https"));
         assertTrue(config.getServiceEndpoint().contains(AmazonDynamoDB.ENDPOINT_PREFIX));
         assertEquals(Regions.US_EAST_1.getName(), config.getSigningRegion());
@@ -114,7 +114,7 @@ public class CommandLineInterfaceTests {
     public void testKclDynamoDbClientDefault() {
         cmd.parse(sampleArgs);
         CommandLineInterface cli = new CommandLineInterface(args);
-        EndpointConfiguration config = cli.createKclDynamoDbEndpointConfiguration();
-        assertEquals(cli.getSourceRegion().getName(), config.getSigningRegion());
+        EndpointConfiguration config = cli.getWorkerCreator().createKclDynamoDbEndpointConfiguration();
+        assertEquals(cli.getWorkerCreator().getSourceRegion().getName(), config.getSigningRegion());
     }
 }

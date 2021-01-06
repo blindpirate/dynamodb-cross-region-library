@@ -60,16 +60,21 @@ public class DynamoDBMasterToReplicasPipeline implements IKinesisConnectorPipeli
                     .withClientConfiguration(clientConfiguration)
                     .build();
 
-            AmazonCloudWatchAsync cloudWatch = AmazonCloudWatchAsyncClient.asyncBuilder()
-                    .withCredentials(credentialsProvider)
-                    .withExecutorFactory(() -> Executors.newFixedThreadPool(MAX_THREADS))
-                    .withRegion(Regions.US_EAST_1)
-                    .build();
+            AmazonCloudWatchAsync cloudWatch =
+                    ((DynamoDBStreamsConnectorConfiguration) configuration).isPublishCloudWatch() ?
+                            AmazonCloudWatchAsyncClient.asyncBuilder()
+                                    .withCredentials(credentialsProvider)
+                                    .withExecutorFactory(() -> Executors.newFixedThreadPool(MAX_THREADS))
+                                    .withRegion(Regions.US_EAST_1)
+                                    .build()
+                            : null;
             return new DynamoDBReplicationEmitter(
                     configuration.APP_NAME,
                     configuration.DYNAMODB_ENDPOINT,
                     configuration.REGION_NAME,
                     configuration.DYNAMODB_DATA_TABLE_NAME,
+                    ((DynamoDBStreamsConnectorConfiguration) configuration).getPrimaryKeyName(),
+                    ((DynamoDBStreamsConnectorConfiguration) configuration).getLastUpdateTimeKeyName(),
                     client,
                     cloudWatch);
         } else {

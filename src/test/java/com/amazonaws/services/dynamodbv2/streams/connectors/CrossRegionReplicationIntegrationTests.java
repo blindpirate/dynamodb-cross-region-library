@@ -139,7 +139,7 @@ public class CrossRegionReplicationIntegrationTests {
 
         //verify the updates on the destination table
         //wait for the worker to start and the update to propagate
-        Thread.sleep(10000);
+        Thread.sleep(5000);
         final List<Item> pdxItems = new ArrayList<>();
         for(Item item : pdxTable.scan()) {
             pdxItems.add(item);

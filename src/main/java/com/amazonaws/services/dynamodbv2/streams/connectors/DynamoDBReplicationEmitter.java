@@ -35,6 +35,7 @@ import com.amazonaws.services.cloudwatch.model.PutMetricDataResult;
 import com.amazonaws.services.cloudwatch.model.StandardUnit;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.DeleteItemRequest;
 import com.amazonaws.services.dynamodbv2.model.DeleteItemResult;
 import com.amazonaws.services.dynamodbv2.model.InternalServerErrorException;
@@ -49,6 +50,8 @@ import com.amazonaws.services.dynamodbv2.model.UpdateItemResult;
 import com.amazonaws.services.kinesis.connectors.UnmodifiableBuffer;
 import com.amazonaws.services.kinesis.connectors.interfaces.IEmitter;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import lombok.extern.log4j.Log4j;
 
 /**
@@ -81,11 +84,11 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
     /**
      * AmazonCloudWatch for emitting metrics.
      */
-    private static final AtomicReference<AmazonCloudWatchAsync> CLOUDWATCH = new AtomicReference<AmazonCloudWatchAsync>();
+    private final AtomicReference<AmazonCloudWatchAsync> CLOUDWATCH = new AtomicReference<AmazonCloudWatchAsync>();
     /**
      * Asynchronous DynamoDB client for writing to the DynamoDB table.
      */
-    private static final AtomicReference<AmazonDynamoDBAsync> DYNAMODB = new AtomicReference<AmazonDynamoDBAsync>();
+    private final AtomicReference<AmazonDynamoDBAsync> DYNAMODB = new AtomicReference<AmazonDynamoDBAsync>();
     /**
      * Maximum number of threads for the Async clients.
      */
@@ -102,6 +105,11 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      * The DynamoDB table.
      */
     private final String tableName;
+
+    private final String primaryKeyName;
+
+    private final String lastUpdateTimeKeyName;
+
     /**
      * The KCL application name
      */
@@ -139,12 +147,14 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      *            The cloudwatch client used for this application
      * @param credentialProvider
      *            The credential provider used for the DynamoDB client
-     * @deprecated Deprecated by {@link #DynamoDBReplicationEmitter(String, String, String, String, AmazonDynamoDBAsync, AmazonCloudWatchAsync)}
+     * @param applicationName
+     *            The application name
+     * @deprecated Deprecated by {@link #DynamoDBReplicationEmitter(String, String, String, String, String, String, AmazonDynamoDBAsync, AmazonCloudWatchAsync)}
      */
     @Deprecated
     public DynamoDBReplicationEmitter(final String applicationName, final String endpoint, final String region, final String tableName,
                                       final AmazonCloudWatchAsync cloudwatch, final AWSCredentialsProvider credentialProvider) {
-        this(applicationName, endpoint, region, tableName,
+        this(applicationName, endpoint, region, tableName, null, null,
                 new AmazonDynamoDBAsyncClient(credentialProvider, new ClientConfiguration().withMaxConnections(MAX_THREADS).withRetryPolicy(PredefinedRetryPolicies.DYNAMODB_DEFAULT), Executors.newFixedThreadPool(MAX_THREADS)),
                 cloudwatch);
     }
@@ -160,7 +170,10 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      */
     public DynamoDBReplicationEmitter(final DynamoDBStreamsConnectorConfiguration configuration, final AmazonDynamoDBAsync dynamoDBAsync,
                                       final AmazonCloudWatchAsync cloudwatch) {
-        this(configuration.APP_NAME, configuration.DYNAMODB_ENDPOINT, configuration.REGION_NAME, configuration.DYNAMODB_DATA_TABLE_NAME,
+        this(configuration.APP_NAME,
+                configuration.DYNAMODB_ENDPOINT,
+                configuration.REGION_NAME,
+                configuration.DYNAMODB_DATA_TABLE_NAME, null, null,
                 dynamoDBAsync, cloudwatch);
     }
 
@@ -177,23 +190,22 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      *            The DynamoDB client used for this application
      * @param cloudwatch
      *            The cloudwatch client used for this application
+     * @param applicationName
+     *            The application name
      */
     @SuppressWarnings("deprecation")
     public DynamoDBReplicationEmitter(final String applicationName, final String endpoint, final String region, final String tableName,
+                                      final String primaryKeyName, final String lastUpdateTimeKeyName,
                                       final AmazonDynamoDBAsync dynamoDBAsync, final AmazonCloudWatchAsync cloudwatch) {
         this.applicationName = applicationName;
         this.endpoint = endpoint;
         this.region = region;
         this.tableName = tableName;
+        this.primaryKeyName = primaryKeyName;
+        this.lastUpdateTimeKeyName = lastUpdateTimeKeyName;
 
-        final boolean setDynamoDB = DYNAMODB.compareAndSet(null, dynamoDBAsync);
-        if (setDynamoDB && dynamoDBAsync != null) {
-//            DYNAMODB.get().setEndpoint(endpoint);
-        }
-        final boolean setCloudWatch = CLOUDWATCH.compareAndSet(null, cloudwatch);
-        if (setCloudWatch && cloudwatch != null) {
-//            CLOUDWATCH.get().setRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion());
-        }
+        DYNAMODB.compareAndSet(null, dynamoDBAsync);
+        CLOUDWATCH.compareAndSet(null, cloudwatch);
         skipErrors = false; // TODO make configurable
     }
 
@@ -212,12 +224,24 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
             PutItemRequest putItemRequest = new PutItemRequest();
             putItemRequest.setItem(record.getDynamodb().getNewImage());
             putItemRequest.setTableName(getTableName());
+            if (primaryKeyName != null) {
+                putItemRequest.setConditionExpression("attribute_not_exists(" + primaryKeyName + ") OR " + lastUpdateTimeKeyName + " < :currentTimestamp");
+                putItemRequest.setExpressionAttributeValues(ImmutableMap.of(
+                        ":currentTimestamp", record.getDynamodb().getNewImage().get(lastUpdateTimeKeyName)
+                ));
+            }
             request = putItemRequest;
         } else if (eventName.equalsIgnoreCase(OperationType.REMOVE.toString())) {
             // For REMOVE: Delete the item from the DynamoDB table
             DeleteItemRequest deleteItemRequest = new DeleteItemRequest();
             deleteItemRequest.setKey(record.getDynamodb().getKeys());
             deleteItemRequest.setTableName(getTableName());
+            if (primaryKeyName != null) {
+                deleteItemRequest.setConditionExpression("attribute_exists(" + primaryKeyName + ") AND " + lastUpdateTimeKeyName + " <= :currentTimestamp");
+                deleteItemRequest.setExpressionAttributeValues(ImmutableMap.of(
+                        ":currentTimestamp", record.getDynamodb().getOldImage().get(lastUpdateTimeKeyName)
+                ));
+            }
             request = deleteItemRequest;
         } else {
             // This should only happen if DynamoDB Streams adds/changes its operation types
@@ -331,10 +355,13 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
                     } else {
                         System.exit(StatusCodes.EIO);
                     }
+                } else if (exception instanceof ConditionalCheckFailedException) {
+                    // Skip
+                    log.warn("Skip ConditionalCheckFailedException: " + record);
+                    doneSignal.countDown();
                 } else if (exception instanceof AmazonClientException) {
                     // This block catches unrecoverable AmazonWebServices errors:
                     //
-                    // ConditionalCheckFailedException - not possible as we are not making conditional writes
                     // LimitExceededException - not possible for PutItem, UpdateItem, or DeleteItem
                     // ResourceInUseException - not possible for PutItem, UpdateItem, or DeleteItem
                     // ResourceNotFoundException - table does not exist
@@ -375,6 +402,8 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      *            The records submitted for processing
      * @param failures
      *            The records that failed to write to DynamoDB
+     * @param retryCount
+     *            The retry count
      */
     protected synchronized void emitCloudWatchMetrics(final List<Record> records, final List<Record> failures, final AtomicInteger retryCount) {
         AmazonCloudWatchAsync cloudwatch = CLOUDWATCH.get();

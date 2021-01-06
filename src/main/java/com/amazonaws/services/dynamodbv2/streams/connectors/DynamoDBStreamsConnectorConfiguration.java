@@ -1,6 +1,6 @@
 /*
  * Copyright 2014-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * 
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
@@ -28,6 +28,12 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
     public static final Map<String, List<String>> DEFAULT_DYNAMODB_REGIONS_TO_TABLES =
             ImmutableMap.<String, List<String>>of(DEFAULT_REGION_NAME, Lists.newArrayList(DEFAULT_DYNAMODB_DATA_TABLE_NAME));
 
+    private final boolean publishCloudWatch;
+
+    private final String primaryKeyName;
+
+    private final String lastUpdateTimeKeyName;
+
     /**
      * Constructor for the DynamoDBStreamsConnectorConfiguration class.
      *
@@ -35,9 +41,31 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
      *            The system properties passed in.
      * @param credentialsProvider
      *            The AWS credentialsProvider
+     * @param publishCloudWatch
+     *            Publish cloudWatch or not
      */
     public DynamoDBStreamsConnectorConfiguration(final Properties properties,
-        final AWSCredentialsProvider credentialsProvider) {
+        final AWSCredentialsProvider credentialsProvider, final boolean publishCloudWatch, final String primaryKeyName, final String lastUpdateTimeKeyName) {
         super(properties, credentialsProvider);
+        this.publishCloudWatch = publishCloudWatch;
+        this.primaryKeyName = primaryKeyName;
+        this.lastUpdateTimeKeyName = lastUpdateTimeKeyName;
+    }
+
+    public DynamoDBStreamsConnectorConfiguration(final Properties properties,
+                                                 final AWSCredentialsProvider credentialsProvider) {
+        this(properties, credentialsProvider, false, null, null);
+    }
+
+    public boolean isPublishCloudWatch() {
+        return publishCloudWatch;
+    }
+
+    public String getPrimaryKeyName() {
+        return primaryKeyName;
+    }
+
+    public String getLastUpdateTimeKeyName() {
+        return lastUpdateTimeKeyName;
     }
 }
