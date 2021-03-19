@@ -47,6 +47,7 @@ public class KinesisWorkerCreator {
     private String destinationTable;
     private List<IKinesisConnectorPipeline<Record, Record>> pipelines = new ArrayList<>();
     private Optional<Long> parentShardPollIntervalMillis = Optional.empty();
+    private long failoverTimeMillis = DynamoDBConnectorConstants.KCL_FAILOVER_TIME;
 
     public KinesisWorkerCreator() {
     }
@@ -163,7 +164,7 @@ public class KinesisWorkerCreator {
                 // make parent shard poll interval tunable to decrease time to run integration test
                 .withParentShardPollIntervalMillis(parentShardPollIntervalMillis.orElse(DynamoDBConnectorConstants.DEFAULT_PARENT_SHARD_POLL_INTERVAL_MILLIS))
                 // avoid losing leases too often - default 60 seconds
-                .withFailoverTimeMillis(DynamoDBConnectorConstants.KCL_FAILOVER_TIME);
+                .withFailoverTimeMillis(failoverTimeMillis);
 
         // create the KCL worker for this connector
         return new Worker.Builder()
@@ -320,6 +321,11 @@ public class KinesisWorkerCreator {
 
     public KinesisWorkerCreator setLastUpdateTimeKeyName(String lastUpdateTimeKeyName) {
         this.lastUpdateTimeKeyName = lastUpdateTimeKeyName;
+        return this;
+    }
+
+    public KinesisWorkerCreator setFailoverTimeMillis(long failoverTimeMillis) {
+        this.failoverTimeMillis = failoverTimeMillis;
         return this;
     }
 }

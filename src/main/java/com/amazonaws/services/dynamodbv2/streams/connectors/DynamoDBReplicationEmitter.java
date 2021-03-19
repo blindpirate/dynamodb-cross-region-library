@@ -206,7 +206,7 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
 
         DYNAMODB.compareAndSet(null, dynamoDBAsync);
         CLOUDWATCH.compareAndSet(null, cloudwatch);
-        skipErrors = false; // TODO make configurable
+        skipErrors = true; // TODO make configurable
     }
 
     /**
@@ -236,12 +236,6 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
             DeleteItemRequest deleteItemRequest = new DeleteItemRequest();
             deleteItemRequest.setKey(record.getDynamodb().getKeys());
             deleteItemRequest.setTableName(getTableName());
-            if (primaryKeyName != null) {
-                deleteItemRequest.setConditionExpression("attribute_exists(" + primaryKeyName + ") AND " + lastUpdateTimeKeyName + " <= :currentTimestamp");
-                deleteItemRequest.setExpressionAttributeValues(ImmutableMap.of(
-                        ":currentTimestamp", record.getDynamodb().getOldImage().get(lastUpdateTimeKeyName)
-                ));
-            }
             request = deleteItemRequest;
         } else {
             // This should only happen if DynamoDB Streams adds/changes its operation types

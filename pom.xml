@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.blindpirate</groupId>
-    <version>1.2.1.12</version>
+    <version>1.2.1.16</version>
     <artifactId>dynamodb-cross-region-replication</artifactId>
     <packaging>jar</packaging>
     <name>DynamoDB Cross-region Replication</name>
@@ -15,7 +15,7 @@
 
     <properties>
         <aws.java.sdk.version>1.11.975</aws.java.sdk.version>
-        <amazon.kinesis-client-library.version>1.14.1</amazon.kinesis-client-library.version>
+        <amazon.kinesis-client-library.version>1.13.3</amazon.kinesis-client-library.version>
         <amazon.kinesis-connectors.version>1.3.0</amazon.kinesis-connectors.version>
         <dynamodb-streams-kinesis-adapter.version>1.5.2</dynamodb-streams-kinesis-adapter.version>
         <guava.version>30.1-jre</guava.version>
