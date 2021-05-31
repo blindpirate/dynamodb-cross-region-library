@@ -30,7 +30,7 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
 
     private final boolean publishCloudWatch;
 
-    private final String primaryKeyName;
+    private final String partitionKeyName;
 
     private final String lastUpdateTimeKeyName;
 
@@ -45,10 +45,10 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
      *            Publish cloudWatch or not
      */
     public DynamoDBStreamsConnectorConfiguration(final Properties properties,
-        final AWSCredentialsProvider credentialsProvider, final boolean publishCloudWatch, final String primaryKeyName, final String lastUpdateTimeKeyName) {
+                                                 final AWSCredentialsProvider credentialsProvider, final boolean publishCloudWatch, final String partitionKeyName, final String lastUpdateTimeKeyName) {
         super(properties, credentialsProvider);
         this.publishCloudWatch = publishCloudWatch;
-        this.primaryKeyName = primaryKeyName;
+        this.partitionKeyName = partitionKeyName;
         this.lastUpdateTimeKeyName = lastUpdateTimeKeyName;
     }
 
@@ -61,8 +61,8 @@ public class DynamoDBStreamsConnectorConfiguration extends KinesisConnectorConfi
         return publishCloudWatch;
     }
 
-    public String getPrimaryKeyName() {
-        return primaryKeyName;
+    public String getPartitionKeyName() {
+        return partitionKeyName;
     }
 
     public String getLastUpdateTimeKeyName() {

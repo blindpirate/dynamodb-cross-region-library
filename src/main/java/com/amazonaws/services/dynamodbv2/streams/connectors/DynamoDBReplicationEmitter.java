@@ -51,7 +51,6 @@ import com.amazonaws.services.kinesis.connectors.UnmodifiableBuffer;
 import com.amazonaws.services.kinesis.connectors.interfaces.IEmitter;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import lombok.extern.log4j.Log4j;
 
 /**
@@ -106,7 +105,7 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      */
     private final String tableName;
 
-    private final String primaryKeyName;
+    private final String partitionKeyName;
 
     private final String lastUpdateTimeKeyName;
 
@@ -195,13 +194,13 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
      */
     @SuppressWarnings("deprecation")
     public DynamoDBReplicationEmitter(final String applicationName, final String endpoint, final String region, final String tableName,
-                                      final String primaryKeyName, final String lastUpdateTimeKeyName,
+                                      final String partitionKeyName, final String lastUpdateTimeKeyName,
                                       final AmazonDynamoDBAsync dynamoDBAsync, final AmazonCloudWatchAsync cloudwatch) {
         this.applicationName = applicationName;
         this.endpoint = endpoint;
         this.region = region;
         this.tableName = tableName;
-        this.primaryKeyName = primaryKeyName;
+        this.partitionKeyName = partitionKeyName;
         this.lastUpdateTimeKeyName = lastUpdateTimeKeyName;
 
         DYNAMODB.compareAndSet(null, dynamoDBAsync);
@@ -224,8 +223,8 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
             PutItemRequest putItemRequest = new PutItemRequest();
             putItemRequest.setItem(record.getDynamodb().getNewImage());
             putItemRequest.setTableName(getTableName());
-            if (primaryKeyName != null) {
-                putItemRequest.setConditionExpression("attribute_not_exists(" + primaryKeyName + ") OR " + lastUpdateTimeKeyName + " < :currentTimestamp");
+            if (partitionKeyName != null) {
+                putItemRequest.setConditionExpression("attribute_not_exists(" + partitionKeyName + ") OR " + lastUpdateTimeKeyName + " < :currentTimestamp");
                 putItemRequest.setExpressionAttributeValues(ImmutableMap.of(
                         ":currentTimestamp", record.getDynamodb().getNewImage().get(lastUpdateTimeKeyName)
                 ));

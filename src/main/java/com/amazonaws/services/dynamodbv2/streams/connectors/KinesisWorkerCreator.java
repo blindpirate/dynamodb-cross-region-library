@@ -42,7 +42,7 @@ public class KinesisWorkerCreator {
     private Optional<Integer> getRecordsLimit = Optional.empty();
     private boolean isPublishCloudWatch;
     private String taskName;
-    private String primaryKeyName;
+    private String partitionKeyName;
     private String lastUpdateTimeKeyName;
     private String destinationTable;
     private List<IKinesisConnectorPipeline<Record, Record>> pipelines = new ArrayList<>();
@@ -144,7 +144,7 @@ public class KinesisWorkerCreator {
                 new KinesisConnectorRecordProcessorFactory<>(
                         pipeline,
                         new DynamoDBStreamsConnectorConfiguration(
-                                properties, credentialsProvider, isPublishCloudWatch, primaryKeyName, lastUpdateTimeKeyName))
+                                properties, credentialsProvider, isPublishCloudWatch, partitionKeyName, lastUpdateTimeKeyName))
         ).collect(Collectors.toList());
 
         // create the KCL configuration with default values
@@ -314,8 +314,8 @@ public class KinesisWorkerCreator {
         return this;
     }
 
-    public KinesisWorkerCreator setPrimaryKeyName(String primaryKeyName) {
-        this.primaryKeyName = primaryKeyName;
+    public KinesisWorkerCreator setPartitionKeyName(String partitionKeyName) {
+        this.partitionKeyName = partitionKeyName;
         return this;
     }
 

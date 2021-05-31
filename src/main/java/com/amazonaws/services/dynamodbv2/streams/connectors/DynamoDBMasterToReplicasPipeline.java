@@ -73,7 +73,7 @@ public class DynamoDBMasterToReplicasPipeline implements IKinesisConnectorPipeli
                     configuration.DYNAMODB_ENDPOINT,
                     configuration.REGION_NAME,
                     configuration.DYNAMODB_DATA_TABLE_NAME,
-                    ((DynamoDBStreamsConnectorConfiguration) configuration).getPrimaryKeyName(),
+                    ((DynamoDBStreamsConnectorConfiguration) configuration).getPartitionKeyName(),
                     ((DynamoDBStreamsConnectorConfiguration) configuration).getLastUpdateTimeKeyName(),
                     client,
                     cloudWatch);
