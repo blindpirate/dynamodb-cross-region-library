@@ -43,7 +43,7 @@ public class DynamoDBMasterToReplicasPipeline implements IKinesisConnectorPipeli
     @Override
     public IEmitter<Record> getEmitter(final KinesisConnectorConfiguration configuration) {
         if (configuration instanceof DynamoDBStreamsConnectorConfiguration) {
-            AWSCredentialsProvider credentialsProvider = new DefaultAWSCredentialsProviderChain();
+            AWSCredentialsProvider credentialsProvider = configuration.AWS_CREDENTIALS_PROVIDER;
             ClientConfiguration clientConfiguration = new ClientConfiguration()
                     .withMaxConnections(MAX_THREADS)
                     .withRetryPolicy(PredefinedRetryPolicies.DYNAMODB_DEFAULT);
@@ -65,7 +65,7 @@ public class DynamoDBMasterToReplicasPipeline implements IKinesisConnectorPipeli
                             AmazonCloudWatchAsyncClient.asyncBuilder()
                                     .withCredentials(credentialsProvider)
                                     .withExecutorFactory(() -> Executors.newFixedThreadPool(MAX_THREADS))
-                                    .withRegion(Regions.US_EAST_1)
+                                    .withRegion(Regions.fromName(configuration.REGION_NAME))
                                     .build()
                             : null;
             return new DynamoDBReplicationEmitter(

@@ -1,6 +1,7 @@
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
 import com.amazonaws.ClientConfiguration;
+import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.client.builder.AwsClientBuilder;
@@ -33,12 +34,16 @@ import java.util.stream.Collectors;
 public class KinesisWorkerCreator {
     private Region sourceRegion;
     private Optional<String> sourceDynamodbEndpoint = Optional.empty();
+    private Optional<String> sourceDynamodbAccessKeyId = Optional.empty();
+    private Optional<String> sourceDynamodbSecretAccessKey = Optional.empty();
     private Optional<String> sourceDynamodbStreamsEndpoint = Optional.empty();
     private String sourceTable;
     private Optional<Region> kclRegion = Optional.empty();
     private Optional<String> kclDynamodbEndpoint = Optional.empty();
     private Region destinationRegion;
     private Optional<String> destinationDynamodbEndpoint = Optional.empty();
+    private Optional<String> destinationDynamodbAccessKeyId = Optional.empty();
+    private Optional<String> destinationDynamodbSecretAccessKey = Optional.empty();
     private Optional<Integer> getRecordsLimit = Optional.empty();
     private boolean isPublishCloudWatch;
     private String taskName;
@@ -83,11 +88,12 @@ public class KinesisWorkerCreator {
 
     public Worker create() {
         // use default credential provider chain to locate appropriate credentials
-        final AWSCredentialsProvider credentialsProvider = new DefaultAWSCredentialsProviderChain();
+        final AWSCredentialsProvider sourceCredentialsProvider = createSourceRegionCredentialProvider();
+        final AWSCredentialsProvider destinationCredentialsProvider = createDestinationRegionCredentialProvider();
 
         // initialize DynamoDB client and set the endpoint properly for source table / region
         final AmazonDynamoDB dynamodbClient = AmazonDynamoDBClientBuilder.standard()
-                .withCredentials(credentialsProvider)
+                .withCredentials(sourceCredentialsProvider)
                 .withEndpointConfiguration(createEndpointConfiguration(sourceRegion, sourceDynamodbEndpoint, AmazonDynamoDB.ENDPOINT_PREFIX))
                 .build();
 
@@ -96,7 +102,7 @@ public class KinesisWorkerCreator {
                 sourceDynamodbStreamsEndpoint, AmazonDynamoDBStreams.ENDPOINT_PREFIX);
         final ClientConfiguration streamsClientConfig = new ClientConfiguration().withGzip(false);
         final AmazonDynamoDBStreams streamsClient = AmazonDynamoDBStreamsClientBuilder.standard()
-                .withCredentials(credentialsProvider)
+                .withCredentials(sourceCredentialsProvider)
                 .withEndpointConfiguration(streamsEndpointConfiguration)
                 .withClientConfiguration(streamsClientConfig)
                 .build();
@@ -109,7 +115,7 @@ public class KinesisWorkerCreator {
 
         // initialize DynamoDB client for KCL
         final AmazonDynamoDB kclDynamoDBClient = AmazonDynamoDBClientBuilder.standard()
-                .withCredentials(credentialsProvider)
+                .withCredentials(sourceCredentialsProvider)
                 .withEndpointConfiguration(createKclDynamoDbEndpointConfiguration())
                 .build();
 
@@ -120,7 +126,7 @@ public class KinesisWorkerCreator {
         final AmazonCloudWatch kclCloudWatchClient;
         if (isPublishCloudWatch) {
             kclCloudWatchClient = AmazonCloudWatchClientBuilder.standard()
-                    .withCredentials(credentialsProvider)
+                    .withCredentials(sourceCredentialsProvider)
                     .withRegion(kclRegion.orElse(sourceRegion).getName()).build();
         } else {
             kclCloudWatchClient = new NoopCloudWatch();
@@ -144,13 +150,13 @@ public class KinesisWorkerCreator {
                 new KinesisConnectorRecordProcessorFactory<>(
                         pipeline,
                         new DynamoDBStreamsConnectorConfiguration(
-                                properties, credentialsProvider, isPublishCloudWatch, partitionKeyName, lastUpdateTimeKeyName))
+                                properties, destinationCredentialsProvider, isPublishCloudWatch, partitionKeyName, lastUpdateTimeKeyName))
         ).collect(Collectors.toList());
 
         // create the KCL configuration with default values
         final KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(actualTaskName,
                 streamArn,
-                credentialsProvider,
+                sourceCredentialsProvider,
                 DynamoDBConnectorConstants.WORKER_LABEL + actualTaskName + UUID.randomUUID().toString())
                 // worker will use checkpoint table if available, otherwise it is safer
                 // to start at beginning of the stream
@@ -174,6 +180,51 @@ public class KinesisWorkerCreator {
                 .dynamoDBClient(kclDynamoDBClient)
                 .cloudWatchClient(kclCloudWatchClient)
                 .build();
+    }
+
+    private AWSCredentialsProvider createSourceRegionCredentialProvider() {
+        if (sourceDynamodbAccessKeyId.isPresent()) {
+            return new ConstantAwsCredentialsProvider(sourceDynamodbAccessKeyId.get(), sourceDynamodbSecretAccessKey.get());
+        } else {
+            return new DefaultAWSCredentialsProviderChain();
+        }
+    }
+
+    private AWSCredentialsProvider createDestinationRegionCredentialProvider() {
+        if (destinationDynamodbAccessKeyId.isPresent()) {
+            return new ConstantAwsCredentialsProvider(destinationDynamodbAccessKeyId.get(), destinationDynamodbSecretAccessKey.get());
+        } else {
+            return new DefaultAWSCredentialsProviderChain();
+        }
+    }
+
+    private static class ConstantAwsCredentialsProvider implements AWSCredentialsProvider {
+        private final String accessKeyId;
+        private final String secretAccessKey;
+
+        public ConstantAwsCredentialsProvider(String accessKeyId, String secretAccessKey) {
+            this.accessKeyId = accessKeyId;
+            this.secretAccessKey = secretAccessKey;
+        }
+
+        @Override
+        public AWSCredentials getCredentials() {
+            return new AWSCredentials() {
+                @Override
+                public String getAWSAccessKeyId() {
+                    return accessKeyId;
+                }
+
+                @Override
+                public String getAWSSecretKey() {
+                    return secretAccessKey;
+                }
+            };
+        }
+
+        @Override
+        public void refresh() {
+        }
     }
 
     @VisibleForTesting
@@ -326,6 +377,18 @@ public class KinesisWorkerCreator {
 
     public KinesisWorkerCreator setFailoverTimeMillis(long failoverTimeMillis) {
         this.failoverTimeMillis = failoverTimeMillis;
+        return this;
+    }
+
+    public KinesisWorkerCreator setSourceDynamodbCredentials(String accessKeyId, String secretAccessKey) {
+        this.sourceDynamodbAccessKeyId = Optional.of(accessKeyId);
+        this.sourceDynamodbSecretAccessKey = Optional.of(secretAccessKey);
+        return this;
+    }
+
+    public KinesisWorkerCreator setDestinationDynamodbCredentials(String accessKeyId, String secretAccessKey) {
+        this.destinationDynamodbAccessKeyId = Optional.of(accessKeyId);
+        this.destinationDynamodbSecretAccessKey = Optional.of(secretAccessKey);
         return this;
     }
 }
